@@ -2,17 +2,28 @@ import sys
 
 def analyze_logs(logs):
     stats = {}
-    for log in logs:
-        parts = log.split()
-        ip, code = parts[0], parts[-2]
+    broken = 0
+    processed = 0
+    for n, log in enumerate(logs, 1):
+        try: 
+            parts = log.split()
+            ip, code, path = parts[0], parts[-2], parts[6]
+        except IndexError:
+            broken += 1
+            print(f"Пропущена битая строка {n}")
+            continue
         stats.setdefault(ip, {"requests": 0, "errors": 0, "paths": set()})
         stats[ip]["requests"] += 1
-        stats[ip]["paths"].add(parts[6])
+        stats[ip]["paths"].add(path)
 
         if code == "404":
             stats[ip]["errors"] += 1
+        processed += 1
 
+    print(f"Всего обработано: {processed} строк, пропущено битых: {broken}")
     return stats
+    
+        
 
 def make_report(stats):
     lines = []
@@ -26,20 +37,28 @@ def read_logs(file_path):
         logs = []
         for line in f:
             stripped = line.strip()
-            if stripped:                    # пропускаем пустые
-                logs.append(stripped)       # кладём уже почищенные
+            if stripped:                    
+                logs.append(stripped)       
         return logs          
     
 if len(sys.argv) < 2:
     print("Использование: python3 log_watcher.py <путь_к_файлу>")
     print("Пример: python3 log_watcher.py access.log")
-    sys.exit(1)  # выход с кодом ошибки
+    sys.exit(1)  
 
-file_path = sys.argv[1]  # берём первый аргумент
-logs = read_logs(file_path)
-report = make_report(analyze_logs(logs))
-print(report)
-
-
+file_path = sys.argv[1]
+try:
+    logs = read_logs(file_path)
+    report = make_report(analyze_logs(logs))
+    print(report)
+except FileNotFoundError:
+    print(f"Ошибка: файл '{file_path}' не найден")
+    sys.exit(1)
+except PermissionError:
+    print(f"Ошибка: нет прав на чтение '{file_path}'")
+    sys.exit(1)
+except UnicodeDecodeError:
+    print(f"Ошибка: файл '{file_path}' повреждён или в неизвестной кодировке")
+    sys.exit(1)
 
 
